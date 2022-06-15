@@ -11,7 +11,7 @@ void EntityManager::update()
 	// - add them to the vector of all entities
 	// - add them to the vecor inside the map, with the tag as a key 
 	//for (std::shared_ptr<Entity> e : m_entitiesToAdd)
-	for (auto e : m_entitiesToAdd)
+	for (std::shared_ptr<Entity> e : m_entitiesToAdd)
 	{
 		m_entities.push_back(e);
 		m_entityMap[e->tag()].push_back(e);

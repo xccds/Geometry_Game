@@ -30,7 +30,7 @@ void Game::init(const std::string& path)
 			int FS; // fullscreen or not
 			inf >> winW >> winH >> FL >> FS;
 
-			m_window.create(sf::VideoMode(winW, winH), "First Game");
+			m_window.create(sf::VideoMode(winW, winH), "First Game", sf::Style::Fullscreen);
 			m_window.setFramerateLimit(FL);
 		}
 		else if (temp_name == "Font")
@@ -71,6 +71,7 @@ void Game::init(const std::string& path)
 	m_text.setPosition(1, 1);
 
 	spawnPlayer();
+	spawnHouse();
 }
 
 void Game::run()
@@ -84,8 +85,8 @@ void Game::run()
 		if (!m_paused)
 		{
 			m_entities.update();
-			//spawnSpecialWeapon();
 			sEnemySpawner();
+			sBoxSpawner();
 			sMovement();
 			sLifespan();
 			sCollision();
@@ -120,7 +121,58 @@ void Game::spawnPlayer()
 
 	entity->cCollision = std::make_shared <CCollision>(m_playConfig.CR);
 
+
 	m_player = entity;
+}
+
+void Game::spawnHouse()
+{
+	auto house = m_entities.addEntity("house");
+
+	house->cTransform = std::make_shared<CTransform>(Vec2(m_window.getSize().x / 2, m_window.getSize().y / 2),
+		Vec2(0, 0), 0.0f, 0);
+
+	house->cShape = std::make_shared<CShape>(m_playConfig.SR*2, 4,
+		sf::Color(m_playConfig.FR, m_playConfig.FG, m_playConfig.FB,0),
+		sf::Color(m_playConfig.OR, m_playConfig.OG, m_playConfig.OB,128), m_playConfig.OT);
+
+	house->cCollision = std::make_shared <CCollision>(m_playConfig.CR*2);
+
+	m_house = house;
+
+
+}
+
+void Game::spawnBox()
+{
+	// random positon
+	srand(time(NULL) + m_currentFrame);
+	int xPosition = rand() % m_window.getSize().x;
+	int yPosition = rand() % m_window.getSize().y;
+
+	float rangle = rand() % 360;
+	const float pi = 3.1415926;
+	float xVelocity = m_playConfig.S * cos(rangle * pi / 180);
+	float yVelocity = m_playConfig.S * sin(rangle * pi / 180);
+
+	int index = rand() % 2;
+	std::string names[] = {"W","L" };
+	std::string boxName = names[index];
+
+	auto Box = m_entities.addEntity(boxName);
+
+	Box->cTransform = std::make_shared<CTransform>(Vec2(xPosition, yPosition),
+		Vec2(xVelocity, yVelocity), 0.0f, m_playConfig.S);
+
+	Box->cShape = std::make_shared<CShape>(m_playConfig.SR , index+3,
+		sf::Color(m_playConfig.FR, m_playConfig.FG, m_playConfig.FB),
+		sf::Color(m_playConfig.OR, m_playConfig.OG, m_playConfig.OB), m_playConfig.OT);
+
+	Box->cCollision = std::make_shared <CCollision>(m_playConfig.CR );
+
+	m_box = Box;
+
+
 }
 
 void Game::spawnEnemy()
@@ -165,7 +217,9 @@ void Game::spawnEnemy()
 
 		enemy->cCollision = std::make_shared <CCollision>(m_enemyConfig.CR);
 
-		enemy->cScore = std::make_shared <CScore>(100);
+		enemy->cScore = std::make_shared <CScore>(50*enemyPoint);
+
+		enemy->cBlood = std::make_shared <CBlood>(enemyPoint-1);
 	}
 	else
 	{
@@ -186,6 +240,8 @@ void Game::spawnEnemy()
 		enemy->cCollision = std::make_shared <CCollision>(m_enemyConfig.CR);
 
 		enemy->cScore = std::make_shared <CScore>(100);
+
+		enemy->cBlood = std::make_shared <CBlood>(1);
 
 	}
 
@@ -221,7 +277,7 @@ void Game::spawnSmallEnemies(std::shared_ptr<Entity> e)
 
 		smallenemy->cCollision = std::make_shared <CCollision>(m_enemyConfig.CR);
 
-		smallenemy->cScore = std::make_shared <CScore>(e->cScore->score*2);
+		smallenemy->cScore = std::make_shared <CScore>(100);
 
 		smallenemy->cLifespan = std::make_shared<CLifespan>(m_enemyConfig.L);
 		//m_lastEnemySpawnTime = m_currentFrame;
@@ -249,38 +305,51 @@ void Game::spawnBullet(std::shared_ptr<Entity> entity, const Vec2& target)
 			sf::Color(m_bulletConfig.OR, m_bulletConfig.OG, m_bulletConfig.OB), m_bulletConfig.OT);
 
 		bullet->cCollision = std::make_shared <CCollision>(m_bulletConfig.CR);
+		bullet->cLifespan = std::make_shared<CLifespan>(m_bulletConfig.L);
 	}
 
 
-	//bullet->cLifespan = std::make_shared<CLifespan>(m_bulletConfig.L);
+	
 
 
 }
 
-//void Game::spawnSpecialWeapon()
-//{
-//	
-//		auto weapon = m_entities.addEntity("weapon");
-//
-//		auto xPosition = entity->cTransform->pos.x;
-//		auto yPosition = entity->cTransform->pos.y;
-//
-//
-//		weapon->cTransform = std::make_shared<CTransform>(Vec2(m_window.getSize().x / 2, m_window.getSize().y / 2),
-//			Vec2(m_playConfig.S, m_playConfig.S), 0.0f, m_playConfig.S);
-//
-//		weapon->cShape = std::make_shared<CShape>(m_playConfig.SR*2, m_playConfig.V,
-//			sf::Color(m_playConfig.FR, m_playConfig.FG, m_playConfig.FB,0),
-//			sf::Color(m_playConfig.OR, m_playConfig.OG, m_playConfig.OB,70), m_playConfig.OT);
-//
-//		weapon->cInput = std::make_shared<CInput>();
-//
-//		weapon->cCollision = std::make_shared <CCollision>(m_playConfig.CR*2);
-//
-//
-//		m_weapon = weapon;
-//
-//}
+void Game::spawnSpecialWeapon(std::shared_ptr<Entity> entity)
+{
+	
+	if ((entity->isActive()) && (m_bulletSpecialWeapon >0))
+	{
+		float angleDelta = 360.0 / 8;
+		float angle = 0;
+		const float pi = 3.1415926;
+
+		for (size_t i = 0; i < 8; i++) {
+			angle += angleDelta;
+			float xVelocity = m_bulletConfig.S * cos(angle * pi / 180);
+			float yVelocity = m_bulletConfig.S * sin(angle * pi / 180);
+
+			auto specialbullet = m_entities.addEntity("bullets");
+
+			specialbullet->cTransform = std::make_shared<CTransform>(entity->cTransform->pos,
+				Vec2(xVelocity, yVelocity), 0.0f, m_bulletConfig.S);
+
+			specialbullet->cShape = std::make_shared<CShape>(m_bulletConfig.SR, m_bulletConfig.V,
+				sf::Color(m_bulletConfig.FR, m_bulletConfig.FG, m_bulletConfig.FB),
+				sf::Color(m_bulletConfig.OR, m_bulletConfig.OG, m_bulletConfig.OB), m_bulletConfig.OT);
+
+			specialbullet->cCollision = std::make_shared <CCollision>(m_bulletConfig.CR);
+		}
+		m_bulletSpecialWeapon--;
+		if (!m_bulletSpecialWeapon)
+		{
+			m_lastSpecialSpawnTime = m_currentFrame;
+			m_specialWeapon--;
+			m_bulletSpecialWeapon = 20;
+		}
+
+	}
+
+}
 
 
 
@@ -288,23 +357,53 @@ void Game::sMovement()
 {
 	// implement all entity movement 
 	// read m_play->cinput to determine if player is moving
+	float speedup = 0;
+	if (m_player->cInput->speedup)
+	{
+		speedup = 2;
+	}
+	else speedup = 1;
+
 	Vec2 playervelocity;
+	float playSpeed = speedup * m_player->cTransform->speed;
+	const float pi = 3.1415926;
 	if (m_player->cInput->left)
 	{
-		playervelocity.x -= m_playConfig.S;
+		playervelocity.x -= playSpeed;
 	}
 	if (m_player->cInput->right)
 	{
-		playervelocity.x += m_playConfig.S;
+		playervelocity.x += playSpeed;
 	}
 	if (m_player->cInput->up)
 	{
-		playervelocity.y -= m_playConfig.S;
+		playervelocity.y -= playSpeed;
 	}
 	if (m_player->cInput->down)
 	{
-		playervelocity.y += m_playConfig.S;
+		playervelocity.y += playSpeed;
 	}
+	if ((m_player->cInput->left) && (m_player->cInput->up))
+	{
+		playervelocity.x = -playSpeed * cos(45 * pi / 180);
+		playervelocity.y = -playSpeed * cos(45 * pi / 180);
+	}
+	if ((m_player->cInput->left) && (m_player->cInput->down))
+	{
+		playervelocity.x = -playSpeed * cos(45 * pi / 180);
+		playervelocity.y = +playSpeed * cos(45 * pi / 180);
+	}
+	if ((m_player->cInput->right) && (m_player->cInput->up))
+	{
+		playervelocity.x = +playSpeed * cos(45 * pi / 180);
+		playervelocity.y = -playSpeed * cos(45 * pi / 180);
+	}
+	if ((m_player->cInput->right) && (m_player->cInput->down))
+	{
+		playervelocity.x = +playSpeed * cos(45 * pi / 180);
+		playervelocity.y = +playSpeed * cos(45 * pi / 180);
+	}
+
 
 	m_player->cTransform->velocity = playervelocity;
 
@@ -347,7 +446,7 @@ void Game::sLifespan()
 
 				sf::Color cf = e->cShape->circle.getFillColor();
 				sf::Color co = e->cShape->circle.getOutlineColor();
-				int newAlpha = 200* e->cLifespan->remaining/ e->cLifespan->total;
+				int newAlpha = 255* e->cLifespan->remaining/ e->cLifespan->total;
 				e->cShape->circle.setFillColor(sf::Color(cf.r, cf.g, cf.b, newAlpha));
 				//e->cShape->circle.setOutlineColor(sf::Color(cf.r, cf.g, cf.b, newAlpha));
 			}
@@ -366,10 +465,20 @@ void Game::sCollision()
 			if (b->cTransform->pos.dist(e->cTransform->pos) 
 				< b->cCollision->radius + e->cCollision->radius)
 			{
-				spawnSmallEnemies(e);
-				m_score += e->cScore->score;
-				b->destroy();
-				e->destroy();
+				if (e->cBlood->blood>2)
+				{
+					e->cBlood->blood--;
+					e->cShape->circle.setPointCount(e->cBlood->blood+1);
+					b->destroy();
+				}
+				else
+				{
+					spawnSmallEnemies(e);
+					m_score += e->cScore->score;
+					b->destroy();
+					e->destroy();
+				}
+
 			}
 		}
 	}
@@ -389,101 +498,141 @@ void Game::sCollision()
 		}
 	}
 
-	//for (auto& e : m_entities.getEntities("enemys"))
+	for (auto& b : m_entities.getEntities("bullets"))
+	{
+		
+	if (m_house->cTransform->pos.dist(b->cTransform->pos)
+		< m_house->cCollision->radius + b->cCollision->radius)
+		{
+			b->destroy();
+		}
+
+	}
+
+
+	//if (m_box->cTransform->pos.dist(m_player->cTransform->pos)
+	//	< m_box->cCollision->radius + m_player->cCollision->radius)
 	//{
-	//	if (m_weapon->cTransform->pos.dist(e->cTransform->pos)
-	//		< m_weapon->cCollision->radius + e->cCollision->radius)
-	//	{
-	//		m_score += e->cScore->score;
-	//		spawnSmallEnemies(e);
-	//		e->destroy();
-	//	}
+	//	m_box->destroy();
+	//	m_lives++;
 	//}
 
 
-		for (auto& e : m_entities.getEntities("enemys"))
+	for (auto& e : m_entities.getEntities())
 		{
-			if (m_player->cTransform->pos.dist(e->cTransform->pos)
-				< m_player->cCollision->radius + e->cCollision->radius)
+			if ((e->tag() == "enemys") || (e->tag() == "smallenemys"))
 			{
-				spawnSmallEnemies(e);
-				e->destroy();
-				if (m_lives)
+				if (m_house->cTransform->pos.dist(e->cTransform->pos)
+					< m_house->cCollision->radius + e->cCollision->radius)
 				{
-					m_lives--;
-					spawnPlayer();
-						
-				}
-				else
-				{
-					for (std::shared_ptr<Entity> e : m_entities.getEntities())
+					if (e->tag() == "enemys")
 					{
+						spawnSmallEnemies(e);
 						e->destroy();
 					}
-					m_score = 0;
-					m_lives = 3;
-					m_shields = 3;
-					spawnPlayer();
+					else if (e->tag() == "smallenemys") e->destroy();
 				}
 
-			}
-		}
-
-		for (auto& e : m_entities.getEntities("smallenemys"))
-		{
-			if (m_player->cTransform->pos.dist(e->cTransform->pos)
-				< m_player->cCollision->radius + e->cCollision->radius)
-			{
-				e->destroy();
-				if (m_lives)
+				if (m_player->cTransform->pos.dist(e->cTransform->pos)
+					< m_player->cCollision->radius + e->cCollision->radius)
 				{
-					m_lives--;
-					spawnPlayer();
-
-				}
-				else
-				{
-					for (std::shared_ptr<Entity> e : m_entities.getEntities())
+					if (e->tag() == "enemys") spawnSmallEnemies(e);
+					e->destroy();
+					if (m_lives)
 					{
-						e->destroy();
+						m_lives--;
+						spawnPlayer();
 					}
-					m_score = 0;
-					m_lives = 3;
-					m_shields = 3;
-					spawnPlayer();
-				}
+					else
+					{
+						for (std::shared_ptr<Entity> e : m_entities.getEntities())
+						{
+							e->destroy();
+						}
+						m_score = 0;
+						m_lives = 3;
+						m_specialWeapon = 3;
+						m_boxScore = 0;
+						spawnPlayer();
+						spawnHouse();
+					}
 
+				}
 			}
+
+			if (e->tag() == "L" || e->tag() == "W")
+			{
+				if (e->cTransform->pos.dist(m_player->cTransform->pos)
+					< e->cCollision->radius + m_player->cCollision->radius)
+				{
+					e->destroy();
+					if (e->tag() == "L") m_lives++;
+					if (e->tag() == "W") m_specialWeapon++;
+				}
+				if ((e->cTransform->pos.x > m_window.getSize().x) || (e->cTransform->pos.x < 0))
+				{
+					e->cTransform->velocity.x = -e->cTransform->velocity.x;
+				}
+				if ((e->cTransform->pos.y > m_window.getSize().y) || (e->cTransform->pos.y < 0))
+				{
+					e->cTransform->velocity.y = -e->cTransform->velocity.y;
+				}
+			}
+			
 		}
+
+		
 
 	for (std::shared_ptr<Entity> e : m_entities.getEntities("enemys"))
-	{
-		if ((e->cTransform->pos.x > m_window.getSize().x) || (e->cTransform->pos.x < 0))
 		{
-			e->cTransform->velocity.x = - e->cTransform->velocity.x;
+			if ((e->cTransform->pos.x > m_window.getSize().x) || (e->cTransform->pos.x < 0))
+			{
+				e->cTransform->velocity.x = -e->cTransform->velocity.x;
+			}
+			if ((e->cTransform->pos.y > m_window.getSize().y) || (e->cTransform->pos.y < 0))
+			{
+				e->cTransform->velocity.y = -e->cTransform->velocity.y;
+			}
 		}
-		if ((e->cTransform->pos.y > m_window.getSize().y) || (e->cTransform->pos.y < 0))
+
+	if (m_player->cInput->speedup)
+	{
+		if (m_player->cTransform->pos.x > m_window.getSize().x)
 		{
-			e->cTransform->velocity.y = - e->cTransform->velocity.y;
+			m_player->cTransform->pos.x = 0;
 		}
-	}
+		if (m_player->cTransform->pos.x < 0)
+		{
+			m_player->cTransform->pos.x = m_window.getSize().x;
+		}
+		if (m_player->cTransform->pos.y > m_window.getSize().y)
+		{
+			m_player->cTransform->pos.y = 0;
+		}
+		if (m_player->cTransform->pos.y < 0)
+		{
+			m_player->cTransform->pos.y = m_window.getSize().y;
+		}
 
-
-	if (m_player->cTransform->pos.x > m_window.getSize().x)
-	{
-		m_player->cTransform->pos.x = 0;
 	}
-	if (m_player->cTransform->pos.x < 0)
+	else
 	{
-		m_player->cTransform->pos.x = m_window.getSize().x;
-	}
-	if (m_player->cTransform->pos.y > m_window.getSize().y)
-	{
-		m_player->cTransform->pos.y = 0;
-	}
-	if (m_player->cTransform->pos.y < 0)
-	{
-		m_player->cTransform->pos.y = m_window.getSize().y;
+		if (m_player->cTransform->pos.x > m_window.getSize().x - m_player->cCollision->radius)
+		{
+			m_player->cTransform->pos.x = m_window.getSize().x - m_player->cCollision->radius;
+		}
+		if (m_player->cTransform->pos.x < m_player->cCollision->radius)
+		{
+			m_player->cTransform->pos.x = m_player->cCollision->radius;
+		}
+		if (m_player->cTransform->pos.y > m_window.getSize().y - m_player->cCollision->radius)
+		{
+			m_player->cTransform->pos.y = m_window.getSize().y - m_player->cCollision->radius;
+		}
+		if (m_player->cTransform->pos.y < m_player->cCollision->radius)
+		{
+			m_player->cTransform->pos.y = m_player->cCollision->radius;
+		}
 	}
 
 }
@@ -498,6 +647,17 @@ void Game::sEnemySpawner()
 	}
 }
 
+void Game::sBoxSpawner()
+{
+
+	if (m_score - m_boxScore > 10000)
+	{
+		spawnBox();
+		m_boxScore += 10000;
+	}
+}
+
+
 void Game::sRender()
 {
 
@@ -506,8 +666,11 @@ void Game::sRender()
 	// Update the  text
 	if (m_best < m_score) m_best = m_score;
 	std::stringstream ss;
-	ss << "Score: " << m_score << "    Lives: " << m_lives << "    Best Score: " << m_best;
+	ss << "Score: " << m_score << "    Lives: " << m_lives 
+		<< "     Weapon: "<< m_specialWeapon
+		<< "    Best Score: " << m_best;
 	m_text.setString(ss.str());
+
 
 	m_window.draw(m_text);
 
@@ -519,55 +682,36 @@ void Game::sRender()
 		m_player->cShape->circle.setRotation(m_player->cTransform->angle);
 
 		m_window.draw(m_player->cShape->circle);
+
 	}
 
 
-
-	for (std::shared_ptr<Entity> e : m_entities.getEntities("enemys"))
-	{
-		e->cShape->circle.setPosition(e->cTransform->pos.x, e->cTransform->pos.y);
-
-		e->cTransform->angle += 1.0f;
-		e->cShape->circle.setRotation(e->cTransform->angle);
-
-		m_window.draw(e->cShape->circle);
-	}
-
-	for (std::shared_ptr<Entity> e : m_entities.getEntities("smallenemys"))
-	{
-		e->cShape->circle.setPosition(e->cTransform->pos.x, e->cTransform->pos.y);
-
-		e->cTransform->angle += 1.0f;
-		e->cShape->circle.setRotation(e->cTransform->angle);
-
-		m_window.draw(e->cShape->circle);
-	}
-
-	for (std::shared_ptr<Entity> e : m_entities.getEntities("bullets"))
-	{
-		e->cShape->circle.setPosition(e->cTransform->pos.x, e->cTransform->pos.y);
-		m_window.draw(e->cShape->circle);
-	}
-
-	//if (m_weapon->isActive())
-	//{
-	//	m_weapon->cShape->circle.setPosition(m_weapon->cTransform->pos.x, m_weapon->cTransform->pos.y);
-
-	//	m_weapon->cTransform->angle += 1.0f;
-	//	m_weapon->cShape->circle.setRotation(m_weapon->cTransform->angle);
-
-	//	m_window.draw(m_weapon->cShape->circle);
-	//}
-
-	//for (std::shared_ptr<Entity> e : m_entities.getEntities("weapon"))
-	//{
-	//	e->cShape->circle.setPosition(e->cTransform->pos.x, e->cTransform->pos.y);
-
-	//	e->cTransform->angle += 1.0f;
-	//	e->cShape->circle.setRotation(e->cTransform->angle);
 	
-	//	m_window.draw(e->cShape->circle);
-	//}
+	for (std::shared_ptr<Entity> e : m_entities.getEntities())
+	{
+		if ((e->tag() == "enemys") || (e->tag() == "smallenemys") || (e->tag() == "L")|| (e->tag() == "W"))
+		{
+		e->cShape->circle.setPosition(e->cTransform->pos.x, e->cTransform->pos.y);
+
+		e->cTransform->angle += 1.0f;
+		e->cShape->circle.setRotation(e->cTransform->angle);
+
+		m_window.draw(e->cShape->circle);
+		}
+
+		if (e->tag() == "bullets")
+		{
+			e->cShape->circle.setPosition(e->cTransform->pos.x, e->cTransform->pos.y);
+			m_window.draw(e->cShape->circle);
+		}
+		if (e->tag() == "house")
+		{
+			e->cShape->circle.setPosition(e->cTransform->pos.x, e->cTransform->pos.y);
+			m_window.draw(e->cShape->circle);
+		}
+
+	}
+
 
 	m_window.display();
 }
@@ -589,24 +733,26 @@ void Game::sUserInput()
 			switch (event.key.code)
 			{
 			case sf::Keyboard::W:
-				//std::cout << "W pressed" << std::endl;
 				m_player->cInput->up = true;
 				break;
 			case sf::Keyboard::S:
-				//std::cout << "S pressed" << std::endl;
 				m_player->cInput->down = true;
 				break;
 			case sf::Keyboard::A:
-				//std::cout << "A pressed" << std::endl;
 				m_player->cInput->left = true;
 				break;
 			case sf::Keyboard::D:
-				//std::cout << "D pressed" << std::endl;
 				m_player->cInput->right = true;
 				break;
-			case sf::Keyboard::Escape:
-				//std::cout << "ESCAP " << std::endl;
+			case sf::Keyboard::Space:
+				m_player->cInput->speedup = true;
+				break;
+			case sf::Keyboard::P:
 				setPaused(!m_paused);
+				break;
+			case sf::Keyboard::Escape:
+				m_running = false;
+				break;
 			}
 
 		}
@@ -616,20 +762,19 @@ void Game::sUserInput()
 			switch (event.key.code)
 			{
 			case sf::Keyboard::W:
-				//std::cout << "W released" << std::endl;
 				m_player->cInput->up = false;
 				break;
 			case sf::Keyboard::S:
-				//std::cout << "S released" << std::endl;
 				m_player->cInput->down = false;
 				break;
 			case sf::Keyboard::A:
-				//std::cout << "A released" << std::endl;
 				m_player->cInput->left = false;
 				break;
 			case sf::Keyboard::D:
-				//std::cout << "D released" << std::endl;
 				m_player->cInput->right = false;
+				break;
+			case sf::Keyboard::Space:
+				m_player->cInput->speedup = false;
 				break;
 			}
 
@@ -641,17 +786,26 @@ void Game::sUserInput()
 			if (event.mouseButton.button == sf::Mouse::Left)
 			{
 				//std::cout << "left mouse clicked at " << event.mouseButton.x << "," << event.mouseButton.y << std::endl;
-				if (!m_paused)
+				if ((!m_paused) && 
+					(m_player->cTransform->pos.dist(m_house->cTransform->pos) >
+						m_player->cCollision->radius + m_house->cCollision->radius))
 				{
 					spawnBullet(m_player, Vec2(event.mouseButton.x, event.mouseButton.y));
 				}
 
 			}
 
-			//if (event.mouseButton.button == sf::Mouse::Right)
-			//{
-			//	spawnSpecialWeapon(m_player);
-			//}
+			if (event.mouseButton.button == sf::Mouse::Right)
+			{
+				if ((!m_paused) &&
+					(m_player->cTransform->pos.dist(m_house->cTransform->pos) >
+						m_player->cCollision->radius + m_house->cCollision->radius))
+				{
+					if ((m_currentFrame - m_lastSpecialSpawnTime > 600) && (m_specialWeapon > 0))
+						spawnSpecialWeapon(m_player);
+				}
+
+			}
 		}
 	}
 }

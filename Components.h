@@ -45,6 +45,14 @@ public:
 		: score{ s } {}
 };
 
+class CBlood
+{
+public:
+	int blood = 0;
+	CBlood(int s)
+		: blood{ s } {}
+};
+
 class CLifespan
 {
 public:
@@ -62,5 +70,6 @@ public:
 	bool right = false;
 	bool down = false;
 	bool shoot = false;
+	bool speedup = false;
 	CInput(){}
 };

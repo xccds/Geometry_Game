@@ -33,17 +33,20 @@ class Game
 	EnemyConig			m_enemyConfig;
 	BulletConfig		m_bulletConfig;
 	int					m_score = 0;
+	int					m_boxScore = 0;
 	int					m_best = 0;
 	int					m_lives = 3;
-	int					m_shields = 3;
 	int					m_currentFrame = 0;
 	int					m_lastEnemySpawnTime = 0;
+	int					m_specialWeapon = 3;
+	int					m_bulletSpecialWeapon = 20;
+	int					m_lastSpecialSpawnTime = 0;
 	bool				m_paused = false;
 	bool				m_running = true; 
-	bool				m_restart = false;
 
 	std::shared_ptr<Entity> m_player;
-	std::shared_ptr<Entity> m_weapon;
+	std::shared_ptr<Entity> m_house;
+	std::shared_ptr<Entity> m_box;
 
 	void init(const std::string& config);	//initialize the game with config file path
 	void setPaused(bool paused);
@@ -54,13 +57,16 @@ class Game
 	void sRender();			// render
 	void sEnemySpawner();	// spawns enemies
 	void sCollision();		// collisions
+	void sBoxSpawner();
 
 	// some helper function below
 	void spawnPlayer();
+	void spawnBox();
 	void spawnEnemy();
+	void spawnHouse();
 	void spawnSmallEnemies(std::shared_ptr<Entity> entity);
 	void spawnBullet(std::shared_ptr<Entity> entity, const Vec2& mousePos);
-	void spawnSpecialWeapon();
+	void spawnSpecialWeapon(std::shared_ptr<Entity> entity);
 
 public:
 	Game(const std::string& config);
