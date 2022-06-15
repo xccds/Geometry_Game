@@ -5,7 +5,7 @@
 安装：
 - 下载game.zip，解压到本地
 - 先安装微软runtime环境
-- 可以去官网(https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) 下载安装x86版本
+- 可以去官网下载安装x86版本 (https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170) 
 - 解压包中也附带了VC_redist.x86.exe文件，运行安装任一即可。
 - 双击game.exe 开始游戏。
 
